@@ -1,0 +1,70 @@
+const int tempPin = A0;        // TMP36 output pin connected to A0
+const int motorPin1 = 2;       // L293D IN1 connected to D2
+const int motorPin2 = 3;       // L293D IN2 connected to D3
+const int enablePin = 5;       // L293D ENA connected to D5 (PWM)
+const float thresholdTemp = 70.0; // Temperature threshold in Celsius
+const int rollerLengthTime = 5000; // Time in milliseconds to stretch/retract 50 cm
+
+bool isExtended = false;       // Track roller's current state (extended or retracted)
+
+void setup() {
+  pinMode(motorPin1, OUTPUT);
+  pinMode(motorPin2, OUTPUT);
+  pinMode(enablePin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int tempReading = analogRead(tempPin);
+  float voltage = tempReading * (5.0 / 1023.0);
+  float temperatureC = (voltage - 0.5) * 100.0;
+
+  Serial.print("Temperature: ");
+  Serial.print(temperatureC);
+  Serial.println(" *C");
+
+  if (temperatureC > thresholdTemp && !isExtended) {
+    // Extend roller only if it's not already extended
+    extendRoller();
+    isExtended = true; // Update state to extended
+  } else if (temperatureC <= thresholdTemp && isExtended) {
+    // Retract roller only if it's currently extended
+    retractRoller();
+    isExtended = false; // Update state to retracted
+  }
+
+  delay(2000); // Wait 2 seconds before next temperature check
+}
+
+void extendRoller() {
+  Serial.println("Extending roller...");
+  digitalWrite(motorPin1, HIGH); // Forward direction
+  digitalWrite(motorPin2, LOW);
+  analogWrite(enablePin, 255); // Full speed
+  
+  // Run motor for the time needed to extend roller to 50 cm
+  delay(rollerLengthTime);
+
+  stopMotor();
+  Serial.println("Roller fully extended.");
+}
+
+void retractRoller() {
+  Serial.println("Retracting roller...");
+  digitalWrite(motorPin1, LOW); // Reverse direction
+  digitalWrite(motorPin2, HIGH);
+  analogWrite(enablePin, 255); // Full speed
+  
+  // Run motor for the time needed to retract roller
+  delay(rollerLengthTime);
+
+  stopMotor();
+  Serial.println("Roller fully retracted.");
+}
+
+void stopMotor() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, LOW);
+  analogWrite(enablePin, 0); // Stop motor
+  Serial.println("Motor stopped.");
+}
