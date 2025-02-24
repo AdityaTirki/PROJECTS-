@@ -1,0 +1,187 @@
+#define BLYNK_TEMPLATE_ID "TMPL3MRbXdVE9"
+#define BLYNK_TEMPLATE_NAME "MAN HOLE"
+#define BLYNK_AUTH_TOKEN "GhuazWagqtlMddZU4OHmUTagFoVeJ5DT"
+
+// WiFi credentials
+const char* ssid     = "Hotspot";
+const char* password = "car@1234";
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+
+// Sensor Pin Definitions for ESP8266
+#define DHTPIN          D2       // DHT22 Temperature Sensor Pin
+#define DHTTYPE         DHT22    // DHT22 Sensor type
+#define TRIG_PIN        D5       // Ultrasonic Sensor Trigger Pin
+#define ECHO_PIN        D6       // Ultrasonic Sensor Echo Pin
+#define MQ6_PIN         A0       // MQ-6 Gas Sensor (Analog pin)
+#define RAIN_SENSOR_PIN D7       // Rain Sensor Pin
+
+DHT dht(DHTPIN, DHTTYPE);
+BlynkTimer timer;
+
+// Global Status Messages
+String waterStatus = "Normal";
+String tempStatus  = "Normal";
+String gasStatus   = "Normal";
+String rainStatus  = "Normal";
+
+// Flags to avoid repeated notifications
+bool waterAlertFlag = false;
+bool tempAlertFlag  = false;
+bool gasAlertFlag   = false;
+bool rainAlertFlag  = false;
+
+void readSensors();
+void checkWaterLevel(float distance);
+void checkTemperature(float temperature);
+void checkGasLevel(int gasValue);
+void checkRain(int rainValue);
+void updateLCD();
+void updateStatusDisplay();
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Initialize Blynk with ESP8266
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, password);
+  
+  // Initialize DHT sensor
+  dht.begin();
+  
+  // Set sensor pin modes
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(RAIN_SENSOR_PIN, INPUT);
+  
+  // Schedule sensor readings every 2 seconds
+  timer.setInterval(2000L, readSensors);
+  
+  Serial.println("Man Hole Monitoring System Initialized with Blynk (ESP8266)!");
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
+
+void readSensors() {
+  // --- Ultrasonic Sensor for Water Level ---
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  float distance = duration * 0.034 / 2; // Convert duration to cm
+  Blynk.virtualWrite(V0, distance);
+  
+  // --- Gas Sensor (MQ-6 for Air Quality) ---
+  int gasValue = analogRead(MQ6_PIN);
+  Blynk.virtualWrite(V2, gasValue);
+  
+  // --- Temperature Sensor (DHT22) ---
+  float temperature = dht.readTemperature();
+  Blynk.virtualWrite(V1, temperature);
+  
+  // --- Rain Sensor ---
+  int rainValue = digitalRead(RAIN_SENSOR_PIN);
+  Blynk.virtualWrite(V3, rainValue);
+  
+  // Check sensor data and trigger notifications if thresholds are exceeded
+  checkWaterLevel(distance);
+  checkTemperature(temperature);
+  checkGasLevel(gasValue);
+  checkRain(rainValue);
+  
+  // Update LCD widgets and Serial Monitor display
+  updateLCD();
+  updateStatusDisplay();
+}
+
+void checkWaterLevel(float distance) {
+  if (distance < 4) {
+    waterStatus = "Water High!";
+    if (!waterAlertFlag) {
+      String message = "Water Level Too High! (" + String(distance) + " cm)";
+      Blynk.logEvent("water_level", message);
+      // Uncomment the line below if you update to the latest Blynk IoT library that supports notifications.
+      // Blynk.notify("ALERT: Water High!");
+      Serial.println("ALERT: " + message);
+      waterAlertFlag = true;
+    }
+  } else {
+    waterStatus = "Water OK";
+    waterAlertFlag = false;
+  }
+}
+
+void checkTemperature(float temperature) {
+  if (temperature > 30) {
+    tempStatus = "Temp High!";
+    if (!tempAlertFlag) {
+      String message = "Temperature Exceeded 30°C! (" + String(temperature) + " °C)";
+      Blynk.logEvent("temperature_detection", message);
+      // Uncomment the line below if you update to the latest Blynk IoT library that supports notifications.
+      // Blynk.notify("ALERT: Temp High!");
+      Serial.println("ALERT: " + message);
+      tempAlertFlag = true;
+    }
+  } else {
+    tempStatus = "Temp OK";
+    tempAlertFlag = false;
+  }
+}
+
+void checkGasLevel(int gasValue) {
+  if (gasValue > 800) {
+    gasStatus = "Gas Alert!";
+    if (!gasAlertFlag) {
+      String message = "Harmful Gases Detected! (Value: " + String(gasValue) + ")";
+      Blynk.logEvent("air_quality_detection", message);
+      // Uncomment the line below if you update to the latest Blynk IoT library that supports notifications.
+      // Blynk.notify("ALERT: Gas Alert!");
+      Serial.println("ALERT: " + message);
+      gasAlertFlag = true;
+    }
+  } else {
+    gasStatus = "Gas OK";
+    gasAlertFlag = false;
+  }
+}
+
+void checkRain(int rainValue) {
+  if (rainValue == 0) {
+    rainStatus = "Rain Detected!";
+    if (!rainAlertFlag) {
+      String message = "Rain Detected!";
+      Blynk.logEvent("rain_detection", message);
+      // Uncomment the line below if you update to the latest Blynk IoT library that supports notifications.
+      // Blynk.notify("ALERT: Rain Detected!");
+      Serial.println("ALERT: " + message);
+      rainAlertFlag = true;
+    }
+  } else {
+    rainStatus = "No Rain";
+    rainAlertFlag = false;
+  }
+}
+
+void updateLCD() {
+  // Update LCD widget texts on virtual pins V4 and V5
+  String lcdText1 = "Water: " + waterStatus + "\nTemp: " + tempStatus;
+  String lcdText2 = "Gas: " + gasStatus + "\nRain: " + rainStatus;
+  Blynk.virtualWrite(V4, lcdText1);
+  Blynk.virtualWrite(V5, lcdText2);
+}
+
+void updateStatusDisplay() {
+  // Print status to the Serial Monitor
+  Serial.println("------- STATUS UPDATE -------");
+  Serial.println("Water: " + waterStatus);
+  Serial.println("Temp: " + tempStatus);
+  Serial.println("Gas: " + gasStatus);
+  Serial.println("Rain: " + rainStatus);
+  Serial.println("-----------------------------");
+}
