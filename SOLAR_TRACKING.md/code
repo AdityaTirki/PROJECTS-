@@ -1,0 +1,37 @@
+#include <Servo.h>
+
+#include <Servo.h> 
+
+Servo myservo;
+
+#define SENSOR_1 2  // Digital sensor 1 (e.g., TCRT5000)
+#define SENSOR_2 3  // Digital sensor 2
+
+int pos = 90;  // Initial position
+
+void setup() {
+    myservo.attach(4); 
+    pinMode(SENSOR_1, INPUT);
+    pinMode(SENSOR_2, INPUT);
+    
+    myservo.write(pos);
+    delay(1000);
+}
+
+void loop() {      
+    int state_1 = digitalRead(SENSOR_1); 
+    int state_2 = digitalRead(SENSOR_2); 
+
+    if (state_1 == HIGH && state_2 == LOW) {  
+        pos = pos + 1;  // Move towards SENSOR_1
+    } 
+    else if (state_1 == LOW && state_2 == HIGH) {  
+        pos = pos - 1;  // Move towards SENSOR_2
+    }
+
+    if (pos > 180) pos = 180; 
+    if (pos < 0) pos = 0; 
+
+    myservo.write(pos);
+    delay(50);
+}
