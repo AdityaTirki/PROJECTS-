@@ -1,0 +1,132 @@
+#define BLYNK_TEMPLATE_ID "TMPL3AGuV_dpQ"
+#define BLYNK_TEMPLATE_NAME "Auto Temperature Detector for Entrance for Covid"
+#define BLYNK_AUTH_TOKEN "6jVByQwVus2y_bflTR2w9__9vwRScgbv"
+#define BLYNK_PRINT Serial
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+#include <IRremoteESP8266.h>
+#include <IRrecv.h>
+#include <IRutils.h>
+
+// **WiFi Credentials**
+char ssid[] = "Hotspot";  
+char pass[] = "car@1234"; 
+
+// **Sensor Pins**
+#define DHTPIN D4         
+#define DHTTYPE DHT11      
+#define IR_SENSOR_PIN D5   
+#define BUZZER_PIN D6      
+#define RED_LED_PIN D7     
+
+// **Temperature & Occupancy Threshold**
+const float TEMP_THRESHOLD = 37.5; 
+const int MAX_OCCUPANCY = 25;      
+
+// **Initialize Sensors**
+DHT dht(DHTPIN, DHTTYPE);
+IRrecv irrecv(IR_SENSOR_PIN);
+decode_results results;
+
+BlynkTimer timer;
+float bodyTemperature;
+int occupancyCount = 0;
+bool feverDetected = false;
+unsigned long ledTimer = 0;
+
+void setup() {
+    Serial.begin(115200);
+    dht.begin();
+
+    pinMode(BUZZER_PIN, OUTPUT);
+    pinMode(RED_LED_PIN, OUTPUT);
+
+    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(RED_LED_PIN, LOW);
+
+    irrecv.enableIRIn(); // Start the IR sensor
+
+    // **Connect to WiFi and Blynk**
+    Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+    timer.setInterval(1000L, updateBlynkData); // **Update Blynk every second**
+    Serial.println("✅ System Ready...");
+}
+
+// **Fast IR Detection Function**
+bool detectPerson() {
+    if (irrecv.decode(&results)) {
+        irrecv.resume();
+        return true;
+    }
+    return false;
+}
+
+// **Fast & Accurate Temperature Measurement**
+float getFastTemperature() {
+    float temp = dht.readTemperature();
+    if (!isnan(temp) && temp > 15.0 && temp < 45.0) { 
+        return temp;
+    }
+    return -1; // Invalid reading
+}
+
+// **Main Loop: Reads Temperature Immediately When IR Sensor Detects a Person**
+void loop() {
+    Blynk.run();
+    timer.run();
+
+    if (detectPerson()) {
+        Serial.println("✅ Person Detected! Reading Temperature...");
+
+        float temp = getFastTemperature();
+        if (temp == -1) {
+            Serial.println("⚠ ERROR: Temperature Reading Failed!");
+            Blynk.virtualWrite(V0, "Error");
+            return;
+        }
+
+        Serial.print("📡 Temperature: ");
+        Serial.print(temp);
+        Serial.println(" °C");
+        Blynk.virtualWrite(V0, temp);  
+
+        if (temp > TEMP_THRESHOLD) {
+            Serial.println("⚠ FEVER ALERT! Activating LED & Buzzer...");
+            feverDetected = true;
+            ledTimer = millis();
+            digitalWrite(RED_LED_PIN, HIGH);
+            digitalWrite(BUZZER_PIN, HIGH);
+            Blynk.virtualWrite(V1, 255);
+            Blynk.logEvent("fever_detected");
+        } else {
+            Serial.println("✅ Temperature Normal.");
+            Blynk.virtualWrite(V1, 0);
+        }
+
+        // **Update Occupancy Count**
+        if (occupancyCount < MAX_OCCUPANCY) {
+            occupancyCount++;
+            Serial.print("🔢 Occupancy Count: ");
+            Serial.println(occupancyCount);
+            Blynk.virtualWrite(V3, occupancyCount);
+        } else {
+            Serial.println("🚫 Max Occupancy Reached! No more entries.");
+        }
+    }
+
+    // **Auto Turn Off Fever Alert After 5 Sec**
+    if (feverDetected && millis() - ledTimer >= 5000) {
+        digitalWrite(RED_LED_PIN, LOW);
+        digitalWrite(BUZZER_PIN, LOW);
+        feverDetected = false;
+        Serial.println("🛑 Fever Alert Ended.");
+    }
+}
+
+// **Blynk Updates**
+void updateBlynkData() {
+    bool personDetected = detectPerson();
+    Blynk.virtualWrite(V2, personDetected ? "Person Detected" : "No Person");
+}
