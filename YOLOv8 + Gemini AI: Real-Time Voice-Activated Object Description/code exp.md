@@ -164,7 +164,4 @@ If you want **even better UI**, you could add:
 - A history of previous detections.
 - Save detected frames with timestamp filenames.
 
----
 
-Would you also like me to make a clean **flowchart diagram** showing the working process? (Perfect for your GitHub or project report!) 🎯🚀  
-👉 Just say "**yes flowchart**"!
