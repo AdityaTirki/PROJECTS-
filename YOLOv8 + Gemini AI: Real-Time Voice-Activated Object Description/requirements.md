@@ -1,5 +1,4 @@
-✅ Sure!  
-You want the installation commands **one-by-one**, clean and clear for each package.
+ installation commands **one-by-one**, clean and clear for each package.
 
 Here’s the full list with explanation:
 
