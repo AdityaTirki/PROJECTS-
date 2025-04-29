@@ -1,10 +1,4 @@
-Got it ✅  
-You want the installation commands **one-by-one**, **proper explanation**, and **only the correct libraries for your YOLO + Gemini GUI project**,  
-**NOT** OpenAI or anything unrelated like nginx.
 
-Here’s the **correct full final version**, exactly the way you asked:
-
----
 
 # 📦 Python Package Installation (One-by-One, Clean and Clear)
 
